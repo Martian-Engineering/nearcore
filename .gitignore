@@ -18,6 +18,10 @@ testdir/
 
 **/.ipynb_checkpoints/*
 
+# MCP repomap files
+.repomap/
+.repomap-cache/
+
 # Editor config files
 .vscode
 # Covers JetBrains IDEs: IntelliJ, RubyMine, PhpStorm, AppCode, PyCharm, CLion, Android Studio, WebStorm and Rider
