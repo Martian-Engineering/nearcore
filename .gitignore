@@ -19,8 +19,7 @@ testdir/
 **/.ipynb_checkpoints/*
 
 # MCP repomap files
-.repomap/
-.repomap-cache/
+.mcp-repomap.tags.cache.v3/
 
 # Editor config files
 .vscode
