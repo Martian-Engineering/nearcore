@@ -10,6 +10,7 @@ use crate::network_protocol::{
 };
 use crate::network_protocol::{RoutedMessage, RoutedMessageV2};
 use crate::types::StateResponseInfo;
+use crate::por::PorMessage;
 use borsh::BorshDeserialize as _;
 use near_async::time::error::ComponentRange;
 use near_primitives::block::{Block, BlockHeader};
@@ -342,6 +343,12 @@ impl From<&PeerMessage> for proto::PeerMessage {
                         ..Default::default()
                     })
                 }
+                PeerMessage::PorMessage(pm) => {
+                    ProtoMT::ProofOfResponse(proto::ProofOfResponse {
+                        content: pm.content.clone(),
+                        ..Default::default()
+                    })
+                }
             }),
             ..Default::default()
         }
@@ -505,6 +512,11 @@ impl TryFrom<&proto::PeerMessage> for PeerMessage {
             ProtoMT::EpochSyncResponse(esr) => PeerMessage::EpochSyncResponse(
                 CompressedData::from_boxed_slice(esr.compressed_proof.clone().into_boxed_slice()),
             ),
+            ProtoMT::ProofOfResponse(por) => {
+                PeerMessage::PorMessage(PorMessage {
+                    content: por.content.clone(),
+                })
+            }
         })
     }
 }

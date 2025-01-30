@@ -307,6 +307,9 @@ pub enum NetworkRequests {
     /// Message originates from the chunk producer and distributed among other validators,
     /// containing the code of the newly-deployed contracts during the main state transition of the witness.
     PartialEncodedContractDeploys(Vec<AccountId>, PartialEncodedContractDeploys),
+
+    /// Send a proof-of-response message to another peer
+    ProofOfResponse(PeerId, String),
 }
 
 #[derive(Debug, actix::Message, strum::IntoStaticStr)]

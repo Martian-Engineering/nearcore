@@ -196,6 +196,9 @@ pub struct NetworkConfig {
     /// Configuration of rate limits for incoming messages.
     pub received_messages_rate_limits: messages_limits::Config,
 
+    /// Whether the Proof of Response protocol is enabled
+    pub por_enabled: bool,
+
     #[cfg(test)]
     pub(crate) event_sink:
         near_async::messaging::Sender<crate::peer_manager::peer_manager_actor::Event>,
@@ -380,6 +383,7 @@ impl NetworkConfig {
             },
             // Use a preset to configure rate limits and override entries with user defined values later.
             received_messages_rate_limits: messages_limits::Config::standard_preset(),
+            por_enabled: true,
             #[cfg(test)]
             event_sink: near_async::messaging::IntoSender::into_sender(
                 near_async::messaging::noop(),
@@ -438,6 +442,7 @@ impl NetworkConfig {
             peer_stats_period: time::Duration::seconds(5),
             ttl_account_id_router: time::Duration::seconds(60 * 60),
             routed_message_ttl: ROUTED_MESSAGE_TTL,
+            por_enabled: true,
             max_routes_to_store: 1,
             highest_peer_horizon: 5,
             push_info_period: time::Duration::milliseconds(100),

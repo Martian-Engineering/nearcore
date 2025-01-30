@@ -92,6 +92,9 @@ pub(crate) struct WhitelistNode {
 }
 
 pub(crate) struct NetworkState {
+    /// Handler for Proof of Response protocol messages
+    pub(crate) por_handler: Option<Arc<crate::por::PorHandler>>,
+    
     /// Dedicated runtime for `NetworkState` which runs in a separate thread.
     /// Async methods of NetworkState are not cancellable,
     /// so calling them from, for example, PeerActor is dangerous because
@@ -187,17 +190,37 @@ impl NetworkState {
         shards_manager_adapter: Sender<ShardsManagerRequestFromNetwork>,
         partial_witness_adapter: PartialWitnessSenderForNetwork,
         whitelist_nodes: Vec<WhitelistNode>,
-    ) -> Self {
-        Self {
+    ) -> Arc<Self> {
+        let node_id = config.node_id();
+        let por_enabled = config.por_enabled;
+
+        // Create a channel for PoR messages
+        let (msg_tx, msg_rx) = tokio::sync::mpsc::unbounded_channel();
+
+        // Create the PorHandler first if enabled
+        let por_handler = if por_enabled {
+            Some(Arc::new(crate::por::PorHandler::new(
+                node_id.clone(),
+                move |target: &PeerId, content: String| {
+                    msg_tx.send((target.clone(), content)).ok();
+                },
+            )))
+        } else {
+            None
+        };
+
+        // Create NetworkState with the handler
+        let state = Self {
             runtime: Runtime::new(),
+            por_handler,
             graph: Arc::new(crate::routing::Graph::new(crate::routing::GraphConfig {
-                node_id: config.node_id(),
+                node_id: node_id.clone(),
                 prune_unreachable_peers_after: PRUNE_UNREACHABLE_PEERS_AFTER,
                 prune_edges_after: Some(PRUNE_EDGES_AFTER),
             })),
             #[cfg(feature = "distance_vector_routing")]
             graph_v2: Arc::new(crate::routing::GraphV2::new(crate::routing::GraphConfigV2 {
-                node_id: config.node_id(),
+                node_id: node_id.clone(),
                 prune_edges_after: Some(PRUNE_EDGES_AFTER),
             })),
             genesis_id,
@@ -206,9 +229,9 @@ impl NetworkState {
             shards_manager_adapter,
             partial_witness_adapter,
             chain_info: Default::default(),
-            tier2: connection::Pool::new(config.node_id()),
-            tier1: connection::Pool::new(config.node_id()),
-            tier3: connection::Pool::new(config.node_id()),
+            tier2: connection::Pool::new(node_id.clone()),
+            tier1: connection::Pool::new(node_id.clone()),
+            tier3: connection::Pool::new(node_id),
             inbound_handshake_permits: Arc::new(tokio::sync::Semaphore::new(LIMIT_PENDING_PEERS)),
             my_public_addr: Arc::new(RwLock::new(None)),
             peer_store,
@@ -231,7 +254,24 @@ impl NetworkState {
             config,
             created_at: clock.now(),
             tier1_advertise_proxies_mutex: tokio::sync::Mutex::new(()),
+        };
+
+        let state_arc = Arc::new(state);
+
+        // If PoR is enabled, spawn the message handling task
+        if por_enabled {
+            let state = Arc::clone(&state_arc);
+            let state_for_spawn = Arc::clone(&state);
+            state.runtime.handle.spawn(async move {
+                let mut msg_rx = msg_rx;  // Take ownership here
+                while let Some((target, content)) = msg_rx.recv().await {
+                    let msg = PeerMessage::PorMessage(crate::por::PorMessage { content });
+                    state_for_spawn.tier2.send_message(target, Arc::new(msg));
+                }
+            });
         }
+
+        state_arc
     }
 
     /// Spawn a future on the runtime which has the same lifetime as the NetworkState instance.
@@ -997,6 +1037,11 @@ impl NetworkState {
 
     /// Sets the chain info, and updates the set of TIER1 keys.
     /// Returns true iff the set of TIER1 keys has changed.
+    /// Get a reference to the PoR handler if enabled
+    pub fn por_handler(&self) -> Option<&Arc<crate::por::PorHandler>> {
+        self.por_handler.as_ref()
+    }
+
     pub fn set_chain_info(self: &Arc<Self>, info: ChainInfo) -> bool {
         let _mutex = self.set_chain_info_mutex.lock();
 

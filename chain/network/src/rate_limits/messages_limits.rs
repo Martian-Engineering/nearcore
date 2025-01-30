@@ -267,7 +267,8 @@ fn get_key_and_token_cost(message: &PeerMessage) -> Option<(RateLimitedPeerMessa
         | PeerMessage::HandshakeFailure(_, _)
         | PeerMessage::LastEdge(_)
         | PeerMessage::Disconnect(_)
-        | PeerMessage::Challenge(_) => None,
+        | PeerMessage::Challenge(_)
+        | PeerMessage::PorMessage(_) => None,
     }
 }
 

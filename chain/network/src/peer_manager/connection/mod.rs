@@ -60,7 +60,8 @@ impl tcp::Tier {
             | PeerMessage::StateRequestHeader(..)
             | PeerMessage::StateRequestPart(..)
             | PeerMessage::EpochSyncRequest
-            | PeerMessage::EpochSyncResponse(..) => self == tcp::Tier::T2,
+            | PeerMessage::EpochSyncResponse(..)
+            | PeerMessage::PorMessage(..) => self == tcp::Tier::T2,
         }
     }
 

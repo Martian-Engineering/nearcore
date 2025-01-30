@@ -826,7 +826,8 @@ fn process_peer_manager_message_default(
         | NetworkRequests::Challenge(_)
         | NetworkRequests::ChunkStateWitnessAck(_, _)
         | NetworkRequests::EpochSyncRequest { .. }
-        | NetworkRequests::EpochSyncResponse { .. } => {}
+        | NetworkRequests::EpochSyncResponse { .. }
+        | NetworkRequests::ProofOfResponse(_, _) => {}
     }
 }
 

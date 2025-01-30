@@ -101,6 +101,9 @@ pub struct PeerManagerActor {
 
     /// State that is shared between multiple threads (including PeerActors).
     pub(crate) state: Arc<NetworkState>,
+    
+    /// Proof of Response protocol handler.
+    por_handler: Option<Arc<crate::por::PorHandler>>,
 }
 
 /// TEST-ONLY
@@ -167,7 +170,7 @@ impl actix::Actor for PeerManagerActor {
 
         // Periodically fix local edges.
         let clock = self.clock.clone();
-        let state = self.state.clone();
+        let state = Arc::clone(&self.state);
         ctx.spawn(wrap_future(async move {
             let mut interval = time::Interval::new(clock.now(), FIX_LOCAL_EDGES_INTERVAL);
             loop {
@@ -178,7 +181,7 @@ impl actix::Actor for PeerManagerActor {
 
         // Periodically update the connection store.
         let clock = self.clock.clone();
-        let state = self.state.clone();
+        let state = Arc::clone(&self.state);
         ctx.spawn(wrap_future(async move {
             let mut interval = time::Interval::new(clock.now(), UPDATE_CONNECTION_STORE_INTERVAL);
             loop {
@@ -243,7 +246,7 @@ impl PeerManagerActor {
             &clock,
             store,
             peer_store,
-            config,
+            config.clone(),
             genesis_id,
             client,
             peer_manager_adapter,
@@ -280,7 +283,7 @@ impl PeerManagerActor {
                                     // a proper connection.
                                     tracing::debug!(target: "network", from = ?stream.peer_addr, "got new connection");
                                     if let Err(err) =
-                                        PeerActor::spawn(clock.clone(), stream, None, state.clone())
+                                        PeerActor::spawn(clock.clone(), stream, None, Arc::clone(&state))
                                     {
                                         tracing::info!(target:"network", ?err, "PeerActor::spawn()");
                                     }
@@ -293,7 +296,7 @@ impl PeerManagerActor {
                     // Connect to TIER1 proxies and broadcast the list those connections periodically.
                     arbiter.spawn({
                         let clock = clock.clone();
-                        let state = state.clone();
+                        let state = Arc::clone(&state);
                         let mut interval = time::Interval::new(clock.now(), cfg.advertise_proxies_interval);
                         async move {
                             loop {
@@ -306,7 +309,7 @@ impl PeerManagerActor {
                     // Update TIER1 connections periodically.
                     arbiter.spawn({
                         let clock = clock.clone();
-                        let state = state.clone();
+                        let state = Arc::clone(&state);
                         let mut interval = tokio::time::interval(cfg.connect_interval.try_into().unwrap());
                         interval.set_missed_tick_behavior(tokio::time::MissedTickBehavior::Skip);
                         async move {
@@ -347,11 +350,20 @@ impl PeerManagerActor {
                 });
             }
         });
+
+        // Initialize the PoR handler if enabled - note that NetworkState already has its own PoR handler
+        let por_handler = if config.por_enabled {
+            state.por_handler.clone()
+        } else {
+            None
+        };
+
         Ok(Self::start_in_arbiter(&arbiter, move |_ctx| Self {
             my_peer_id: my_peer_id.clone(),
             started_connect_attempts: false,
-            state,
+            state: Arc::clone(&state),
             clock,
+            por_handler,
         }))
     }
 
@@ -1093,6 +1105,14 @@ impl PeerManagerActor {
                     );
                 }
                 NetworkResponses::NoResponse
+            },
+            NetworkRequests::ProofOfResponse(peer_id, message) => {
+                if let Some(handler) = &self.por_handler {
+                    handler.send_message(&peer_id, message);
+                    NetworkResponses::NoResponse
+                } else {
+                    NetworkResponses::RouteNotFound
+                }
             }
             NetworkRequests::EpochSyncRequest { peer_id } => {
                 if self.state.tier2.send_message(peer_id, PeerMessage::EpochSyncRequest.into()) {

@@ -16,6 +16,7 @@ use near_primitives::stateless_validation::partial_witness::PartialEncodedStateW
 use near_primitives::stateless_validation::state_witness::ChunkStateWitnessAck;
 pub use peer::*;
 pub use state_sync::*;
+use crate::por::PorMessage;
 
 #[cfg(test)]
 pub(crate) mod testonly;
@@ -440,6 +441,9 @@ pub enum PeerMessage {
     /// Gracefully disconnect from other peer.
     Disconnect(Disconnect),
     Challenge(Box<Challenge>),
+
+    /// A proof-of-response message containing a string to echo back
+    PorMessage(PorMessage),
 
     SyncSnapshotHosts(SyncSnapshotHosts),
     StateRequestHeader(ShardId, CryptoHash),
