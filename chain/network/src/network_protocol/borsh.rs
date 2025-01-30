@@ -19,6 +19,8 @@ use near_primitives::epoch_sync::CompressedEpochSyncProof;
 use std::fmt;
 use std::fmt::Formatter;
 
+use super::{PoRRequest, PoRResponse};
+
 #[derive(BorshSerialize, PartialEq, Eq, Clone, Debug, ProtocolSchema)]
 /// Structure representing handshake between peers.
 /// This replaces deprecated handshake `HandshakeV2`.
@@ -170,6 +172,8 @@ pub(super) enum PeerMessage {
 
     EpochSyncRequest,
     EpochSyncResponse(CompressedEpochSyncProof),
+    PoRRequest(PoRRequest),
+    PoRResponse(PoRResponse),
 }
 #[cfg(target_arch = "x86_64")] // Non-x86_64 doesn't match this requirement yet but it's not bad as it's not production-ready
 const _: () = assert!(std::mem::size_of::<PeerMessage>() <= 1500, "PeerMessage > 1500 bytes");

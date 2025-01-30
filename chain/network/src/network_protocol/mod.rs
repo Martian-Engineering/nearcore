@@ -4,9 +4,11 @@ mod borsh_;
 mod borsh_conv;
 mod edge;
 mod peer;
+mod por;
 mod proto_conv;
 mod state_sync;
 pub use edge::*;
+pub use por::*;
 use near_primitives::stateless_validation::chunk_endorsement::ChunkEndorsement;
 use near_primitives::stateless_validation::contract_distribution::ChunkContractAccesses;
 use near_primitives::stateless_validation::contract_distribution::ContractCodeRequest;
@@ -412,6 +414,10 @@ pub struct Disconnect {
 #[derive(PartialEq, Eq, Clone, Debug, strum::IntoStaticStr, strum::EnumVariantNames)]
 #[allow(clippy::large_enum_variant)]
 pub enum PeerMessage {
+    /// Proof of Response protocol messages
+    PoRRequest(PoRRequest),
+    PoRResponse(PoRResponse),
+
     Tier1Handshake(Handshake),
     Tier2Handshake(Handshake),
     Tier3Handshake(Handshake),

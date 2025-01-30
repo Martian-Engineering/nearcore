@@ -1,0 +1,13 @@
+syntax = "proto3";
+
+package protocol;
+
+// A simple request from one node to another
+message PoRRequest {
+    bytes payload = 1;
+}
+
+// A simple response from the target node
+message PoRResponse {
+    bytes payload = 1;
+}
