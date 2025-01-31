@@ -1035,13 +1035,13 @@ impl NetworkState {
         return self.tier2.load().ready.values().map(|c| c.peer_info.clone()).collect();
     }
 
-    /// Sets the chain info, and updates the set of TIER1 keys.
-    /// Returns true iff the set of TIER1 keys has changed.
     /// Get a reference to the PoR handler if enabled
     pub fn por_handler(&self) -> Option<&Arc<crate::por::PorHandler>> {
         self.por_handler.as_ref()
     }
 
+    /// Sets the chain info, and updates the set of TIER1 keys.
+    /// Returns true iff the set of TIER1 keys has changed.
     pub fn set_chain_info(self: &Arc<Self>, info: ChainInfo) -> bool {
         let _mutex = self.set_chain_info_mutex.lock();
 
