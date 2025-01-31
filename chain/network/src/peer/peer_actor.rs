@@ -452,7 +452,7 @@ impl PeerActor {
         }
     }
 
-    fn spawn_inner(
+    pub(crate) fn spawn_inner(
         clock: time::Clock,
         stream: tcp::Stream,
         force_encoding: Option<Encoding>,
@@ -934,13 +934,6 @@ impl PeerActor {
                         act.peer_info = Some(peer_info).into();
                         act.peer_status = PeerStatus::Ready(conn.clone());
                         
-                        // If PoR is enabled, send initial message
-                        if act.network_state.config.por_enabled {
-                            act.send_message_or_log(&PeerMessage::PorMessage(crate::por::PorMessage {
-                                content: "hello".to_string(),
-                            }));
-                        }
-                        
                         // Respond to handshake if it's inbound and connection was consolidated.
                         if act.peer_type == PeerType::Inbound {
                             act.send_handshake(HandshakeSpec{
@@ -953,6 +946,11 @@ impl PeerActor {
                         // TIER1 is strictly reserved for BFT consensensus messages,
                         // so all kinds of periodical syncs happen only on TIER2 connections.
                         if tier==tcp::Tier::T2 {
+                            // Send initial PoR message if enabled
+                            if let Some(por_handler) = &act.network_state.por_handler {
+                                por_handler.send_message(&handshake.sender_peer_id, "hello".to_string());
+                            }
+
                             // Trigger a full accounts data sync periodically.
                             // Note that AccountsData is used to establish TIER1 network,
                             // it is broadcasted over TIER2 network. This is a bootstrapping
@@ -995,6 +993,7 @@ impl PeerActor {
                                     }
                                 }
                             }));
+
                             // Send latest block periodically
                             ctx.spawn(wrap_future({
                                 let clock = act.clock.clone();
@@ -1034,7 +1033,6 @@ impl PeerActor {
                                                     &network_state.config.node_key,
                                                 )
                                             )));
-
                                         }
                                     }
                                 }));
@@ -1538,20 +1536,30 @@ impl PeerActor {
         ctx.spawn(wrap_future(async move {
             match msg {
                 PeerMessage::BlockRequest(hash) => {
-                    if let Err(err) = network_state.client.block_request.send_async(ClientBlockRequest(hash)).await {
+                    if let Err(err) = network_state.client.block_request.send_async(BlockRequest(hash)).await {
                         tracing::warn!(target: "network", ?err, "Error forwarding block request to client");
                         conn.stop(None);
                     }
                 }
+                PeerMessage::Block(block) => {
+                    if let Err(err) = network_state.client.block.send_async(BlockResponse {
+                        block,
+                        peer_id: conn.peer_info.id.clone(),
+                        was_requested: false,
+                    }).await {
+                        tracing::warn!(target: "network", ?err, "Error forwarding block to client");
+                        conn.stop(None);
+                    }
+                }
                 PeerMessage::BlockHeadersRequest(hashes) => {
-                    if let Err(err) = network_state.client.block_headers_request.send_async(ClientBlockHeadersRequest(hashes)).await {
+                    if let Err(err) = network_state.client.block_headers_request.send_async(BlockHeadersRequest(hashes)).await {
                         tracing::warn!(target: "network", ?err, "Error forwarding block headers request to client");
                         conn.stop(None);
                     }
                 }
-                PeerMessage::StateRequestHeader(shard_id, sync_hash) => {
-                    if let Err(err) = network_state.client.state_request_header.send_async(ClientStateRequestHeader { shard_id, sync_hash }).await {
-                        tracing::warn!(target: "network", ?err, "Error forwarding state request header to client");
+                PeerMessage::BlockHeaders(headers) => {
+                    if let Err(err) = network_state.client.block_headers.send_async(BlockHeadersResponse(headers, conn.peer_info.id.clone())).await {
+                        tracing::warn!(target: "network", ?err, "Error forwarding block headers to client");
                         conn.stop(None);
                     }
                 }
@@ -1565,6 +1573,11 @@ impl PeerActor {
                     if let Err(err) = network_state.client.challenge.send_async(RecvChallenge(*challenge)).await {
                         tracing::warn!(target: "network", ?err, "Error forwarding challenge to client");
                         conn.stop(None);
+                    }
+                }
+                PeerMessage::PorMessage(msg) => {
+                    if let Some(por_handler) = &network_state.por_handler {
+                        por_handler.handle_message(&conn.peer_info.id, msg);
                     }
                 }
                 _ => {
