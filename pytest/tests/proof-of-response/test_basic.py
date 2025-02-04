@@ -48,14 +48,14 @@ class ProofOfResponseTest(unittest.TestCase):
 
         # Check logs for evidence of PoR messages being sent and received
         # The nodes are hardcoded to send "hello" to their peers on startup
-        self.assertTrue(wait_for_message(nodes[0], "Sending PoR message"),
-            "Node 0 did not send PoR message")
-        self.assertTrue(wait_for_message(nodes[1], "Received PoR message"),
-            "Node 1 did not receive PoR message")
-        self.assertTrue(wait_for_message(nodes[1], "Sending PoR message"),
-            "Node 1 did not echo message back")
-        self.assertTrue(wait_for_message(nodes[0], "Received PoR message"),
-            "Node 0 did not receive echo response")
+        self.assertTrue(wait_for_message(nodes[0], "Sending PoR request"),
+            "Node 0 did not send PoR request")
+        self.assertTrue(wait_for_message(nodes[1], "Received PoR request"),
+            "Node 1 did not receive PoR request")
+        self.assertTrue(wait_for_message(nodes[1], "Sending PoR response"),
+            "Node 1 did not send PoR response")
+        self.assertTrue(wait_for_message(nodes[0], "Received PoR response"),
+            "Node 0 did not receive PoR response")
 
         # Clean up
         for node in nodes:

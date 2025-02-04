@@ -451,8 +451,15 @@ message EpochSyncResponse {
   bytes compressed_proof = 1;
 }
 
+enum ProofOfResponse_Type {
+  UNKNOWN = 0;
+  Request = 1;
+  Response = 2;
+}
+
 message ProofOfResponse {
-  string content = 1;
+  ProofOfResponse_Type type = 1;
+  string content = 2;
 }
 
 // PeerMessage is a wrapper of all message types exchanged between NEAR nodes.

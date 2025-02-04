@@ -10,7 +10,7 @@ use crate::network_protocol::{
 };
 use crate::network_protocol::{RoutedMessage, RoutedMessageV2};
 use crate::types::StateResponseInfo;
-use crate::por::PorMessage;
+use crate::por::{PorMessage, RequestMessage, ResponseMessage};
 use borsh::BorshDeserialize as _;
 use near_async::time::error::ComponentRange;
 use near_primitives::block::{Block, BlockHeader};
@@ -344,10 +344,20 @@ impl From<&PeerMessage> for proto::PeerMessage {
                     })
                 }
                 PeerMessage::PorMessage(pm) => {
-                    ProtoMT::ProofOfResponse(proto::ProofOfResponse {
-                        content: pm.content.clone(),
-                        ..Default::default()
-                    })
+                    ProtoMT::ProofOfResponse(
+                        match pm {
+                            PorMessage::Request(request) => proto::ProofOfResponse {
+                                type_: proto::ProofOfResponse_Type::Request.into(),
+                                content: request.content.clone(),
+                                ..Default::default()
+                            },
+                            PorMessage::Response(response) => proto::ProofOfResponse {
+                                type_: proto::ProofOfResponse_Type::Response.into(),
+                                content: response.content.clone(),
+                                ..Default::default()
+                            }
+                        }
+                    )
                 }
             }),
             ..Default::default()
@@ -359,6 +369,7 @@ pub type ParsePeersRequestError = std::io::Error;
 pub type ParseTransactionError = std::io::Error;
 pub type ParseRoutedError = std::io::Error;
 pub type ParseChallengeError = std::io::Error;
+pub type ParsePorMessageError = std::io::Error;
 
 #[derive(thiserror::Error, Debug)]
 pub enum ParsePeerMessageError {
@@ -404,6 +415,8 @@ pub enum ParsePeerMessageError {
     StateResponse(ParseRequiredError<ParseStateInfoError>),
     #[error("sync_snapshot_hosts: {0}")]
     SyncSnapshotHosts(ParseSyncSnapshotHostsError),
+    #[error("por_message: {0}")]
+    PorMessage(ParsePorMessageError),
 }
 
 impl TryFrom<&proto::PeerMessage> for PeerMessage {
@@ -513,9 +526,18 @@ impl TryFrom<&proto::PeerMessage> for PeerMessage {
                 CompressedData::from_boxed_slice(esr.compressed_proof.clone().into_boxed_slice()),
             ),
             ProtoMT::ProofOfResponse(por) => {
-                PeerMessage::PorMessage(PorMessage {
-                    content: por.content.clone(),
-                })
+                match por.type_.enum_value_or_default() {
+                    proto::ProofOfResponse_Type::Request => PeerMessage::PorMessage(
+                        PorMessage::Request(RequestMessage { content: por.content.clone() })
+                    ),
+                    proto::ProofOfResponse_Type::Response => PeerMessage::PorMessage(
+                        PorMessage::Response(ResponseMessage { content: por.content.clone() })
+                    ),
+                    proto::ProofOfResponse_Type::UNKNOWN => return Err(Self::Error::PorMessage(std::io::Error::new(
+                        std::io::ErrorKind::InvalidData,
+                        "Unknown ProofOfResponse type"
+                    ))),
+                }
             }
         })
     }

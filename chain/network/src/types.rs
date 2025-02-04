@@ -11,6 +11,7 @@ pub use crate::network_protocol::{
 };
 use crate::routing::routing_table_view::RoutingTableInfo;
 pub use crate::state_sync::StateSyncResponse;
+use crate::por::PorMessage;
 use near_async::messaging::{AsyncSender, Sender};
 use near_async::{time, MultiSend, MultiSendMessage, MultiSenderFrom};
 use near_crypto::PublicKey;
@@ -309,7 +310,7 @@ pub enum NetworkRequests {
     PartialEncodedContractDeploys(Vec<AccountId>, PartialEncodedContractDeploys),
 
     /// Send a proof-of-response message to another peer
-    ProofOfResponse(PeerId, String),
+    ProofOfResponse(PeerId, PorMessage),
 }
 
 #[derive(Debug, actix::Message, strum::IntoStaticStr)]

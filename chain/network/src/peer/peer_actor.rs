@@ -15,6 +15,7 @@ use crate::network_protocol::{
     RoutedMessageBody, RoutingTableUpdate, SnapshotHostInfoVerificationError, SyncAccountsData,
     SyncSnapshotHosts,
 };
+use crate::por::{PorMessage, RequestMessage, ResponseMessage};
 use crate::peer::stream;
 use crate::peer::tracker::Tracker;
 use crate::peer_manager::connection;
@@ -749,7 +750,7 @@ impl PeerActor {
                         if tier==tcp::Tier::T2 {
                             // Send initial PoR message if enabled
                             if let Some(por_handler) = &act.network_state.por_handler {
-                                por_handler.send_message(&handshake.sender_peer_id, "hello".to_string());
+                                por_handler.send_message(&handshake.sender_peer_id, PorMessage::Request(RequestMessage { content: "hello".to_string().into() }));
                             }
                             // Trigger a full accounts data sync periodically.
                             // Note that AccountsData is used to establish TIER1 network,

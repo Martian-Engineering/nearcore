@@ -35,6 +35,7 @@ use crate::types::{
     ChainInfo, PeerManagerSenderForNetwork, PeerType, ReasonForBan, StatePartRequestBody,
     Tier3Request, Tier3RequestBody,
 };
+use crate::por::PorMessage;
 use anyhow::Context;
 use arc_swap::ArcSwap;
 use near_async::messaging::{CanSend, SendAsync, Sender};
@@ -201,8 +202,8 @@ impl NetworkState {
         let por_handler = if por_enabled {
             Some(Arc::new(crate::por::PorHandler::new(
                 node_id.clone(),
-                move |target: &PeerId, content: String| {
-                    msg_tx.send((target.clone(), content)).ok();
+                move |target: &PeerId, por_message: PorMessage| {
+                    msg_tx.send((target.clone(), por_message)).ok();
                 },
             )))
         } else {
@@ -264,8 +265,8 @@ impl NetworkState {
             let state_for_spawn = Arc::clone(&state);
             state.runtime.handle.spawn(async move {
                 let mut msg_rx = msg_rx;  // Take ownership here
-                while let Some((target, content)) = msg_rx.recv().await {
-                    let msg = PeerMessage::PorMessage(crate::por::PorMessage { content });
+                while let Some((target, por_message)) = msg_rx.recv().await {
+                    let msg = PeerMessage::PorMessage(por_message);
                     state_for_spawn.tier2.send_message(target, Arc::new(msg));
                 }
             });

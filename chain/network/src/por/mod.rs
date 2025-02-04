@@ -4,22 +4,35 @@ use near_o11y::tracing::info;
 use borsh::{BorshSerialize, BorshDeserialize};
 
 #[derive(Debug, BorshSerialize, BorshDeserialize, PartialEq, Eq, Hash, Clone)]
-pub struct PorMessage {
+pub struct RequestMessage {
     pub content: String,
 }
 
+#[derive(Debug, BorshSerialize, BorshDeserialize, PartialEq, Eq, Hash, Clone)]
+pub struct ResponseMessage {
+    pub content: String,
+}
+
+#[derive(Debug, BorshSerialize, BorshDeserialize, PartialEq, Eq, Hash, Clone)]
+pub enum PorMessage {
+    Request(RequestMessage),
+    Response(ResponseMessage),
+//    EdgeCut(EdgeCutMessage),
+//    Sync(SyncMessage),
+//    Payment(PaymentMessage),
+//    Ack(AckMessage),
+}
+
 /// PoR protocol handler.
-/// This implementation is a simple echo server - when it receives a string message from a peer,
-/// it sends the same string back as a PoR response.
 pub struct PorHandler {
     my_peer_id: PeerId,
-    send_message: Arc<dyn Fn(&PeerId, String) + Send + Sync>,
+    send_message: Arc<dyn Fn(&PeerId, PorMessage) + Send + Sync>,
 }
 
 impl PorHandler {
     pub fn new(
         my_peer_id: PeerId,
-        send_message: impl Fn(&PeerId, String) + Send + Sync + 'static,
+        send_message: impl Fn(&PeerId, PorMessage) + Send + Sync + 'static,
     ) -> Self {
         Self {
             my_peer_id,
@@ -28,15 +41,28 @@ impl PorHandler {
     }
 
     /// Sends a PoR message to the specified peer
-    pub fn send_message(&self, target: &PeerId, content: String) {
-        info!(target: "por", "Sending PoR message to {}: {}", target, content);
-        (self.send_message)(target, content);
+    pub fn send_message(&self, target: &PeerId, message: PorMessage) {
+        match message.clone() {
+            PorMessage::Request(request) => {
+                info!(target: "por", "Sending PoR request to {}: {:?}", target, request);
+            }
+            PorMessage::Response(response) => {
+                info!(target: "por", "Sending PoR response to {}: {:?}", target, response);
+            }
+        }
+        (self.send_message)(target, message);
     }
 
     /// Handles a received PoR message
     pub fn handle_message(&self, source: &PeerId, message: PorMessage) {
-        info!(target: "por", "Received PoR message from {}: {}", source, message.content);
-        // Echo the message back
-        self.send_message(source, message.content);
+        match message {
+            PorMessage::Request(request) => {
+                info!(target: "por", "Received PoR request from {}: {:?}", source, request);
+                self.send_message(source, PorMessage::Response(ResponseMessage { content: request.content }));
+            }
+            PorMessage::Response(response) => {
+                info!(target: "por", "Received PoR response from {}: {:?}", source, response);
+            }
+        }
     }
 }
