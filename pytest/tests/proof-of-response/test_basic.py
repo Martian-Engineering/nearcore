@@ -23,6 +23,7 @@ def wait_for_message(node, expected_message, timeout=TIMEOUT_SEC):
         if tracker.check(expected_message):
             return True
         time.sleep(0.1)
+        tracker.reset()
     return False
 
 class ProofOfResponseTest(unittest.TestCase):
