@@ -452,7 +452,56 @@ message EpochSyncResponse {
 }
 
 message ProofOfResponse {
-  string content = 1;
+  // Request/Response identifiers
+  string node = 1;
+  google.protobuf.Timestamp timestamp = 2;
+  uint32 sequence = 3;
+
+  // Message payload
+  oneof response_type {
+    RequestMessage request = 4;
+    ResponseMessage response = 5;
+    EdgeCutMessage edge_cut = 6;
+    SyncMessage sync = 7;
+    PaymentMessage payment = 8;
+    AckMessage ack = 9;
+    NodeIdMessage node_id = 10;
+  }
+}
+
+message RequestMessage {
+  string payload = 1;
+  repeated string path = 2;
+  uint64 total_latency_ms = 3;  // Duration in milliseconds
+  uint64 total_cost = 4;
+}
+
+message ResponseMessage {
+  string payload = 1;
+}
+
+message EdgeCutMessage {
+  string node1 = 1;
+  string node2 = 2;
+}
+
+message SyncMessage {
+  google.protobuf.Timestamp next_expected = 1;
+  bool has_late_payment = 2;
+}
+
+message PaymentMessage {
+  uint64 amount = 1;
+  uint64 latency_so_far_ms = 2;  // Duration in milliseconds
+}
+
+message AckMessage {
+  // No additional fields needed
+}
+
+message NodeIdMessage {
+  string node_name = 1;
+  uint32 node_version = 2;
 }
 
 // PeerMessage is a wrapper of all message types exchanged between NEAR nodes.

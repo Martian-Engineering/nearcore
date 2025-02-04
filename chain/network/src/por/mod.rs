@@ -3,9 +3,87 @@ use std::sync::Arc;
 use near_o11y::tracing::info;
 use borsh::{BorshSerialize, BorshDeserialize};
 
-#[derive(Debug, BorshSerialize, BorshDeserialize, PartialEq, Eq, Hash, Clone)]
-pub struct PorMessage {
-    pub content: String,
+use chrono::{DateTime, Utc};
+use std::time::Duration;
+
+#[derive(Debug, Clone, PartialEq, Eq, Hash, BorshSerialize, BorshDeserialize)]
+pub struct RequestId {
+    pub node: String,
+    pub timestamp: DateTime<Utc>,
+    pub sequence: u32,
+}
+
+impl RequestId {
+    pub fn new(node: String, sequence: u32) -> Self {
+        Self {
+            node,
+            timestamp: Utc::now(),
+            sequence,
+        }
+    }
+
+    pub fn to_string(&self) -> String {
+        format!("{}-{}-{:04}", self.node, self.timestamp.timestamp(), self.sequence)
+    }
+}
+
+#[derive(Debug, Clone, BorshSerialize, BorshDeserialize)]
+pub struct RequestMessage {
+    pub request_id: RequestId,
+    pub payload: String,
+    pub path: Vec<String>,
+    pub total_latency: Duration,
+    pub total_cost: u64,
+}
+
+#[derive(Debug, Clone, BorshSerialize, BorshDeserialize)]
+pub struct ResponseMessage {
+    pub request_id: RequestId,
+    pub payload: String,
+}
+
+#[derive(Debug, Clone, BorshSerialize, BorshDeserialize)]
+pub struct EdgeCutMessage {
+    pub request_id: RequestId,
+    pub node1: String,
+    pub node2: String,
+}
+
+#[derive(Debug, Clone, BorshSerialize, BorshDeserialize)]
+pub struct SyncMessage {
+    pub request_id: RequestId,
+    pub timestamp: DateTime<Utc>,
+    pub next_expected: DateTime<Utc>,
+    pub has_late_payment: bool,
+}
+
+#[derive(Debug, Clone, BorshSerialize, BorshDeserialize)]
+pub struct PaymentMessage {
+    pub request_id: RequestId,
+    pub amount: u64,
+    pub latency_so_far: Duration,
+}
+
+#[derive(Debug, Clone, BorshSerialize, BorshDeserialize)]
+pub struct AckMessage {
+    pub request_id: RequestId,
+}
+
+#[derive(Debug, Clone, BorshSerialize, BorshDeserialize)]
+pub struct NodeIdMessage {
+    pub node_name: String,
+    pub node_version: u32,
+}
+
+#[derive(Debug, Clone, BorshSerialize, BorshDeserialize)]
+pub enum PorMessage {
+    Request(RequestMessage),
+    Response(ResponseMessage), 
+    EdgeCut(EdgeCutMessage),
+    Sync(SyncMessage),
+    Payment(PaymentMessage),
+    Ack(AckMessage),
+    NodeId(NodeIdMessage),
 }
 
 /// PoR protocol handler.
