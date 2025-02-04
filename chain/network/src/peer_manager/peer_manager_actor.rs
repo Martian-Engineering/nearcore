@@ -1108,7 +1108,7 @@ impl PeerManagerActor {
             },
             NetworkRequests::ProofOfResponse(peer_id, message) => {
                 if let Some(handler) = &self.por_handler {
-                    handler.send_message(&peer_id, message);
+                    handler.send_message(&peer_id, crate::por::PorMessage { content: message });
                     NetworkResponses::NoResponse
                 } else {
                     NetworkResponses::RouteNotFound

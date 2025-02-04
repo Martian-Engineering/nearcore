@@ -199,12 +199,12 @@ impl NetworkState {
 
         // Create the PorHandler first if enabled
         let por_handler = if por_enabled {
-            Some(Arc::new(crate::por::PorHandler::new(
-                node_id.clone(),
-                move |target: &PeerId, content: String| {
-                    msg_tx.send((target.clone(), content)).ok();
-                },
-            )))
+                Some(Arc::new(crate::por::PorHandler::new(
+                    node_id.clone(),
+                    move |target: &PeerId, content: crate::por::PorMessage| {
+                        msg_tx.send((target.clone(), content.content)).ok();
+                    },
+                )))
         } else {
             None
         };
