@@ -8,6 +8,7 @@ mod announce_accounts;
 mod network_protocol;
 mod peer;
 mod peer_manager;
+mod por;
 mod private_actix;
 mod rate_limits;
 mod snapshot_hosts;
