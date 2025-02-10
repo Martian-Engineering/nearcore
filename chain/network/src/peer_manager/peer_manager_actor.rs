@@ -29,9 +29,14 @@ use anyhow::Context as _;
 use near_async::messaging::{SendAsync, Sender};
 use near_async::time;
 use near_o11y::{handler_debug_span, handler_trace_span, WithSpanContext};
+use futures::FutureExt;
 use near_performance_metrics_macros::perf;
 use near_primitives::block::GenesisId;
-use near_primitives::network::{AnnounceAccount, PeerId};
+use near_primitives::network::{AnnounceAccount, PeerId}; 
+use near_primitives::transaction::{Action, SignedTransaction, TransferAction};
+use near_primitives::types::AccountId;
+use crate::client::ProcessTxRequest;
+use near_crypto::InMemorySigner;
 use near_primitives::views::{
     ConnectionInfoView, EdgeView, KnownPeerStateView, NetworkGraphView, NetworkRoutesView,
     PeerStoreView, RecentOutboundConnectionsView, SnapshotHostInfoView, SnapshotHostsView,
@@ -1097,7 +1102,55 @@ impl PeerManagerActor {
             },
             NetworkRequests::ProofOfResponse(peer_id, message) => {
                 if let Some(handler) = &self.state.por_handler {
-                    handler.send_message(&peer_id, message);
+                    handler.send_message(&peer_id, message.clone());
+                    
+                    // Convert peer IDs to AccountIds
+                    if let (Ok(signer_id), Ok(receiver_id)) = (
+                        AccountId::try_from(self.my_peer_id.to_string()),
+                        AccountId::try_from(peer_id.to_string())
+                    ) {
+                        if let Some(chain_info) = self.state.chain_info.load().as_ref() {
+                            // Create test transfer of 0.0001 NEAR
+                            let transfer_action = Action::Transfer(TransferAction { 
+                                deposit: 100_000_000_000_000 // 0.0001 NEAR 
+                            });
+
+                            // Use test signer for POC transactions
+                            let test_signer = InMemorySigner::test_signer(&signer_id);
+
+                            // Get latest info from chain
+                            let block_hash = chain_info.block.header().hash();
+                            let nonce = chain_info.block.header().height() + 1;
+
+                            // Build signed transaction
+                            let tx = SignedTransaction::from_actions(
+                                nonce,
+                                signer_id.clone(),
+                                receiver_id.clone(),
+                                &test_signer,
+                                vec![transfer_action],
+                                *block_hash,
+                                100_000_000_000 // 100 TGas limit
+                            );
+
+                            // Submit through transaction sender's async interface
+                            match self.state.client.transaction.send_async(ProcessTxRequest {
+                                transaction: tx,
+                                is_forwarded: false,
+                                check_only: false,
+                            }).now_or_never() {
+                                Some(Err(err)) => {
+                                    tracing::warn!(target: "network", ?err, "Failed to send PoR test transaction");
+                                }
+                                Some(Ok(_)) => {
+                                    tracing::debug!(target: "network", ?signer_id, ?receiver_id, "Successfully sent PoR test transaction");
+                                }
+                                None => {
+                                    tracing::debug!(target: "network", ?signer_id, ?receiver_id, "PoR test transaction queued for sending");
+                                }
+                            }
+                        }
+                    }
                     NetworkResponses::NoResponse
                 } else {
                     NetworkResponses::RouteNotFound
