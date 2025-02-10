@@ -101,9 +101,6 @@ pub struct PeerManagerActor {
 
     /// State that is shared between multiple threads (including PeerActors).
     pub(crate) state: Arc<NetworkState>,
-    
-    /// Proof of Response protocol handler.
-    por_handler: Option<Arc<crate::por::PorHandler>>,
 }
 
 /// TEST-ONLY
@@ -351,19 +348,11 @@ impl PeerManagerActor {
             }
         });
 
-        // Initialize the PoR handler if enabled - note that NetworkState already has its own PoR handler
-        let por_handler = if config.por_enabled {
-            state.por_handler.clone()
-        } else {
-            None
-        };
-
         Ok(Self::start_in_arbiter(&arbiter, move |_ctx| Self {
             my_peer_id: my_peer_id.clone(),
             started_connect_attempts: false,
             state: Arc::clone(&state),
             clock,
-            por_handler,
         }))
     }
 
@@ -1107,7 +1096,7 @@ impl PeerManagerActor {
                 NetworkResponses::NoResponse
             },
             NetworkRequests::ProofOfResponse(peer_id, message) => {
-                if let Some(handler) = &self.por_handler {
+                if let Some(handler) = &self.state.por_handler {
                     handler.send_message(&peer_id, message);
                     NetworkResponses::NoResponse
                 } else {
